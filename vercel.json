@@ -1,5 +1,3 @@
-@"
 {
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
-"@ | Set-Content C:\dev\mg-games\vercel.json

@@ -1,0 +1,198 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- App background gradient - deep earthy green -->
+    <radialGradient id="bgGrad" cx="50%" cy="40%" r="70%">
+      <stop offset="0%"   stop-color="#3d7a25"/>
+      <stop offset="100%" stop-color="#1a3a0a"/>
+    </radialGradient>
+
+    <!-- Snake body gradient -->
+    <linearGradient id="bodyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#4ade80"/>
+      <stop offset="100%" stop-color="#15803d"/>
+    </linearGradient>
+
+    <!-- Snake dark outline -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <!-- Wood grain for boxes -->
+    <linearGradient id="woodGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#c4833a"/>
+      <stop offset="50%"  stop-color="#a0692a"/>
+      <stop offset="100%" stop-color="#7a4e1e"/>
+    </linearGradient>
+
+    <!-- Title text gradient -->
+    <linearGradient id="titleGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#c8e87a"/>
+      <stop offset="100%" stop-color="#86a830"/>
+    </linearGradient>
+
+    <!-- Golden glow for legend -->
+    <radialGradient id="goldGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="rgba(255,215,0,0.35)"/>
+      <stop offset="100%" stop-color="rgba(255,215,0,0)"/>
+    </radialGradient>
+
+    <clipPath id="roundedSquare">
+      <rect width="512" height="512" rx="112" ry="112"/>
+    </clipPath>
+  </defs>
+
+  <!-- ── App icon rounded square background ── -->
+  <g clip-path="url(#roundedSquare)">
+
+    <!-- Background -->
+    <rect width="512" height="512" fill="url(#bgGrad)"/>
+
+    <!-- Grass lane stripes -->
+    <rect x="0"   y="0" width="170" height="512" fill="#3a7d2c" opacity="0.6"/>
+    <rect x="171" y="0" width="170" height="512" fill="#4a9a38" opacity="0.6"/>
+    <rect x="342" y="0" width="170" height="512" fill="#3a7d2c" opacity="0.6"/>
+
+    <!-- Wooden fence dividers -->
+    <rect x="168" y="0" width="7" height="512" fill="#5c3d1a"/>
+    <rect x="170" y="0" width="3" height="512" fill="#8b5e2a" opacity="0.6"/>
+    <rect x="337" y="0" width="7" height="512" fill="#5c3d1a"/>
+    <rect x="339" y="0" width="3" height="512" fill="#8b5e2a" opacity="0.6"/>
+
+    <!-- ── Wooden crate obstacles ── -->
+    <!-- Left crate -->
+    <g transform="translate(28, 180)">
+      <rect x="0" y="0" width="112" height="90" rx="8" fill="url(#woodGrad)"/>
+      <rect x="0" y="30" width="112" height="2" fill="#7a4e1e" opacity="0.6"/>
+      <rect x="0" y="60" width="112" height="2" fill="#7a4e1e" opacity="0.6"/>
+      <rect x="36" y="0" width="2" height="90" fill="#7a4e1e" opacity="0.35"/>
+      <rect x="74" y="0" width="2" height="90" fill="#7a4e1e" opacity="0.35"/>
+      <!-- Corner brackets -->
+      <rect x="0"   y="0"  width="10" height="10" fill="#5a5a5a"/>
+      <rect x="102" y="0"  width="10" height="10" fill="#5a5a5a"/>
+      <rect x="0"   y="80" width="10" height="10" fill="#5a5a5a"/>
+      <rect x="102" y="80" width="10" height="10" fill="#5a5a5a"/>
+      <!-- Highlight -->
+      <rect x="4" y="4" width="104" height="8" fill="rgba(255,220,140,0.18)" rx="2"/>
+      <!-- X mark -->
+      <line x1="14" y1="14" x2="98" y2="76" stroke="rgba(255,255,255,0.25)" stroke-width="3" stroke-linecap="round"/>
+      <line x1="98" y1="14" x2="14" y2="76" stroke="rgba(255,255,255,0.25)" stroke-width="3" stroke-linecap="round"/>
+    </g>
+
+    <!-- Right crate -->
+    <g transform="translate(372, 290)">
+      <rect x="0" y="0" width="112" height="90" rx="8" fill="url(#woodGrad)"/>
+      <rect x="0" y="30" width="112" height="2" fill="#7a4e1e" opacity="0.6"/>
+      <rect x="0" y="60" width="112" height="2" fill="#7a4e1e" opacity="0.6"/>
+      <rect x="36" y="0" width="2" height="90" fill="#7a4e1e" opacity="0.35"/>
+      <rect x="74" y="0" width="2" height="90" fill="#7a4e1e" opacity="0.35"/>
+      <rect x="0"   y="0"  width="10" height="10" fill="#5a5a5a"/>
+      <rect x="102" y="0"  width="10" height="10" fill="#5a5a5a"/>
+      <rect x="0"   y="80" width="10" height="10" fill="#5a5a5a"/>
+      <rect x="102" y="80" width="10" height="10" fill="#5a5a5a"/>
+      <rect x="4" y="4" width="104" height="8" fill="rgba(255,220,140,0.18)" rx="2"/>
+      <line x1="14" y1="14" x2="98" y2="76" stroke="rgba(255,255,255,0.25)" stroke-width="3" stroke-linecap="round"/>
+      <line x1="98" y1="14" x2="14" y2="76" stroke="rgba(255,255,255,0.25)" stroke-width="3" stroke-linecap="round"/>
+    </g>
+
+    <!-- ── Mouse (rat) collectible ── -->
+    <g transform="translate(198, 88)">
+      <!-- Body -->
+      <ellipse cx="60" cy="38" rx="38" ry="28" fill="#c8a97e" stroke="#a07850" stroke-width="2"/>
+      <!-- Head -->
+      <ellipse cx="88" cy="28" rx="24" ry="20" fill="#c8a97e" stroke="#a07850" stroke-width="2"/>
+      <!-- Ear -->
+      <ellipse cx="100" cy="12" rx="13" ry="13" fill="#e8c4a0" stroke="#a07850" stroke-width="1.5"/>
+      <!-- Eye -->
+      <circle cx="96" cy="22" r="4" fill="#1a1a1a"/>
+      <circle cx="94" cy="20" r="1.5" fill="rgba(255,255,255,0.6)"/>
+      <!-- Tail -->
+      <path d="M 22 44 Q 0 60, 4 76" fill="none" stroke="#a07850" stroke-width="3" stroke-linecap="round"/>
+      <!-- Nose -->
+      <circle cx="110" cy="26" r="3" fill="#d4909a"/>
+      <!-- Whiskers -->
+      <line x1="110" y1="24" x2="126" y2="20" stroke="rgba(255,255,255,0.7)" stroke-width="1.5"/>
+      <line x1="110" y1="26" x2="128" y2="26" stroke="rgba(255,255,255,0.7)" stroke-width="1.5"/>
+      <!-- Glow -->
+      <ellipse cx="60" cy="38" rx="50" ry="40" fill="rgba(245,215,110,0.2)"/>
+    </g>
+
+    <!-- ── Snake body — S-curve through the lanes ── -->
+    <!-- Dark outline -->
+    <path d="M 256 570 C 256 510, 85 470, 85 400 C 85 330, 256 300, 256 230 C 256 175, 170 140, 170 110"
+      fill="none" stroke="#15803d" stroke-width="58" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Main green body -->
+    <path d="M 256 570 C 256 510, 85 470, 85 400 C 85 330, 256 300, 256 230 C 256 175, 170 140, 170 110"
+      fill="none" stroke="url(#bodyGrad)" stroke-width="50" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Belly highlight stripe -->
+    <path d="M 256 570 C 256 510, 85 470, 85 400 C 85 330, 256 300, 256 230 C 256 175, 170 140, 170 110"
+      fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Scale shine -->
+    <path d="M 256 570 C 256 510, 85 470, 85 400 C 85 330, 256 300, 256 230 C 256 175, 170 140, 170 110"
+      fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- ── Snake head — sits at top of body curve, facing upper-left ── -->
+    <!-- Body ends around x=170, y=110 heading upper-left at ~-50deg -->
+    <!-- Head centre placed just ahead of body tip, rotated to match -->
+    <g transform="translate(170, 110) rotate(-50)">
+      <!-- Dark outline -->
+      <ellipse cx="0" cy="-22" rx="26" ry="34" fill="#15803d"/>
+      <!-- Main head shape - rounded, slightly pointed snout -->
+      <ellipse cx="0" cy="-22" rx="22" ry="30" fill="#4ade80"/>
+      <!-- Snout tip slightly narrower -->
+      <ellipse cx="0" cy="-46" rx="14" ry="10" fill="#4ade80"/>
+      <!-- Chin/belly colour hint -->
+      <ellipse cx="0" cy="-18" rx="10" ry="18" fill="#6ee7a0" opacity="0.4"/>
+      <!-- Top highlight -->
+      <ellipse cx="0" cy="-28" rx="14" ry="10" fill="rgba(255,255,255,0.18)"/>
+      <!-- Eyes — wide set, round -->
+      <circle cx="-16" cy="-30" r="8" fill="#15803d"/>
+      <circle cx="-16" cy="-30" r="6" fill="#fff"/>
+      <circle cx="-15" cy="-29" r="3.5" fill="#111"/>
+      <circle cx="-17" cy="-31" r="1.5" fill="rgba(255,255,255,0.75)"/>
+
+      <circle cx="16"  cy="-30" r="8" fill="#15803d"/>
+      <circle cx="16"  cy="-30" r="6" fill="#fff"/>
+      <circle cx="17"  cy="-29" r="3.5" fill="#111"/>
+      <circle cx="15"  cy="-31" r="1.5" fill="rgba(255,255,255,0.75)"/>
+
+      <!-- Nostrils -->
+      <ellipse cx="-6" cy="-50" rx="3" ry="2" fill="#15803d"/>
+      <ellipse cx="6"  cy="-50" rx="3" ry="2" fill="#15803d"/>
+
+      <!-- Tongue -->
+      <line x1="0" y1="-52" x2="0"   y2="-66" stroke="#f87171" stroke-width="3" stroke-linecap="round"/>
+      <line x1="0" y1="-62" x2="-9"  y2="-74" stroke="#f87171" stroke-width="2.5" stroke-linecap="round"/>
+      <line x1="0" y1="-62" x2="9"   y2="-74" stroke="#f87171" stroke-width="2.5" stroke-linecap="round"/>
+    </g>
+
+    <!-- ── Title text ── -->
+    <text x="256" y="448"
+      font-family="Georgia, 'Times New Roman', serif"
+      font-size="68"
+      font-weight="900"
+      fill="url(#titleGrad)"
+      text-anchor="middle"
+      letter-spacing="3">SNAKE</text>
+    <text x="256" y="504"
+      font-family="Georgia, 'Times New Roman', serif"
+      font-size="50"
+      font-weight="700"
+      fill="#c8a060"
+      text-anchor="middle"
+      letter-spacing="6">RUNNER</text>
+
+    <!-- Vignette overlay -->
+    <radialGradient id="vig" cx="50%" cy="50%" r="70%">
+      <stop offset="60%" stop-color="rgba(0,0,0,0)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0.45)"/>
+    </radialGradient>
+    <rect width="512" height="512" fill="url(#vig)"/>
+
+  </g>
+
+  <!-- Rounded square border -->
+  <rect width="512" height="512" rx="112" ry="112"
+    fill="none" stroke="rgba(139,96,20,0.6)" stroke-width="8"/>
+
+</svg>

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import snakeIcon from "./assets/snake-icon.png";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const COLS         = 3;
@@ -26,6 +27,41 @@ const LANE_COLORS = ["#3a7d2c", "#4a9a38", "#3a7d2c"];
 
 // How many path samples the initial snake body spans
 const INIT_BODY_PX  = 100; // initial body length in px
+
+// ─── Legend skin rendering helpers ──────────────────────────────────────────
+// Deterministic hash → 0..1. Same seed always gives same number, so blotch
+// shapes are stable frame-to-frame instead of shimmering.
+function legendRand01(seed) {
+  const x = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+// Irregular blotch outline as {fwd, side} offsets — used for the head crown
+// blotch (a rigid stamp, drawn under translate/rotate).
+function legendBlotchShape(seed, rxBase, ryBase) {
+  const nPts = 9;
+  const pts = [];
+  for (let i = 0; i < nPts; i++) {
+    const a = (i / nPts) * Math.PI * 2;
+    const j = 0.7 + legendRand01(seed * 13.3 + i * 7.7) * 0.55;
+    pts.push({ fwd: Math.cos(a) * rxBase * j, side: Math.sin(a) * ryBase * j });
+  }
+  return pts;
+}
+
+function legendFillBlotch(ctx, pts, fill) {
+  ctx.beginPath();
+  ctx.moveTo((pts[0].fwd + pts[pts.length - 1].fwd) / 2,
+             (pts[0].side + pts[pts.length - 1].side) / 2);
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i];
+    const b = pts[(i + 1) % pts.length];
+    ctx.quadraticCurveTo(a.fwd, a.side, (a.fwd + b.fwd) / 2, (a.side + b.side) / 2);
+  }
+  ctx.closePath();
+  ctx.fillStyle = fill;
+  ctx.fill();
+}
 
 
 // ─── Snake Skins ──────────────────────────────────────────────────────────────
@@ -447,6 +483,17 @@ export default function SnakeRunner() {
         setSelectedSkin(skinId);
       }
       if (pfp) setPfpUrl(pfp);
+
+      // TEST HOOK: any name ending in "+legend" starts with the Legend skin
+      // unlocked and selected, so it can be tested without earning every
+      // achievement. Remove before shipping.
+      if (name.toLowerCase().endsWith("+legend")) {
+        if (!stats.unlockedSkins.includes("legend")) stats.unlockedSkins.push("legend");
+        userStatsRef.current = stats;
+        setUserStats({ ...stats });
+        selectedSkinRef.current = "legend";
+        setSelectedSkin("legend");
+      }
     } else {
       setUserStats({ ...userStatsRef.current });
     }
@@ -895,41 +942,113 @@ export default function SnakeRunner() {
           }
 
           if (skin.id === "legend") {
-            // ── Legend skin: black base + spots locked to body path ──
-            strokeRibbon(BODY_R * 2 + 5, "#0a0705");
-            strokeRibbon(BODY_R * 2,     "#070503");
-
-            // legendSpots is pre-generated once (see initGame).
-            // Each spot has a t=0..1 position along body length.
-            // We find the matching point in pts[] and draw there so spots ride the snake.
-            for (const sp of (gs.legendSpots || [])) {
-              const ptIdx = Math.floor(sp.t * (pts.length - 1));
-              const ptA   = pts[Math.min(ptIdx,   pts.length - 1)];
-              const ptB   = pts[Math.min(ptIdx+1, pts.length - 1)];
-              const frac  = sp.t * (pts.length - 1) - ptIdx;
-              const mx2   = ptA.x + (ptB.x - ptA.x) * frac;
-              const my2   = ptA.y + (ptB.y - ptA.y) * frac;
-              const dx = ptB.x - ptA.x, dy = ptB.y - ptA.y;
-              const ln = Math.sqrt(dx*dx + dy*dy) || 1;
-              const nx = -dy/ln, ny = dx/ln;
-              const cx2 = mx2 + nx * sp.side * BODY_R * 0.7;
-              const cy2 = my2 + ny * sp.side * BODY_R * 0.7;
-              const bodyAng = Math.atan2(dy, dx) + sp.rot;
-              ctx.save();
-              ctx.translate(cx2, cy2);
-              ctx.rotate(bodyAng);
-              for (const seg of sp.segs) {
-                ctx.beginPath();
-                ctx.ellipse(0, 0, sp.rx + sp.gap, sp.ry + sp.gap, 0, seg.sa, seg.sa + seg.al);
-                ctx.lineWidth = sp.ringW; ctx.strokeStyle = sp.ringColor; ctx.stroke();
+            // ── Legend skin: tapered body + body-space gold blotches ──
+            // Tail tapers to a point over the last TAIL_PTS points.
+            const TAIL_PTS = 16;
+            const halfWidthAt = (i) => {
+              const fromTail = pts.length - 1 - i;
+              if (fromTail >= TAIL_PTS) return BODY_R;
+              return BODY_R * Math.pow(fromTail / TAIL_PTS, 0.8);
+            };
+            const buildBodyOutline = () => {
+              const path = new Path2D();
+              const left = [], right = [];
+              for (let i = 0; i < pts.length; i++) {
+                const a = pts[i];
+                const b = pts[Math.min(i + 1, pts.length - 1)];
+                const dx = b.x - a.x, dy = b.y - a.y;
+                const ln = Math.hypot(dx, dy) || 1;
+                const nx = -dy / ln, ny = dx / ln;
+                const w = halfWidthAt(i);
+                left.push({ x: a.x + nx * w, y: a.y + ny * w });
+                right.push({ x: a.x - nx * w, y: a.y - ny * w });
               }
-              const grd = ctx.createRadialGradient(0,0,0,0,0,sp.rx);
-              grd.addColorStop(0, sp.c0); grd.addColorStop(0.6, sp.c1); grd.addColorStop(1, sp.c2);
-              ctx.beginPath(); ctx.ellipse(0,0,sp.rx,sp.ry,0,0,Math.PI*2);
-              ctx.fillStyle = grd; ctx.fill();
-              ctx.restore();
+              path.moveTo(left[0].x, left[0].y);
+              for (let i = 1; i < left.length; i++) path.lineTo(left[i].x, left[i].y);
+              for (let i = right.length - 1; i >= 0; i--) path.lineTo(right[i].x, right[i].y);
+              path.closePath();
+              return path;
+            };
+
+            const bodyPath = buildBodyOutline();
+            ctx.save();
+            ctx.lineWidth = 5; ctx.lineJoin = "round";
+            ctx.strokeStyle = "#1a1008"; ctx.stroke(bodyPath);
+            ctx.fillStyle = "#0b0805"; ctx.fill(bodyPath);
+            ctx.restore();
+
+            // Arc-length map: turn "distance along body" into screen pos + tangent.
+            const cum = [0];
+            for (let i = 1; i < pts.length; i++) {
+              cum[i] = cum[i - 1] + Math.hypot(pts[i].x - pts[i-1].x, pts[i].y - pts[i-1].y);
             }
-            strokeRibbon(BODY_R * 2 + 5, "#000", 0.35);
+            const bodyLen = cum[cum.length - 1];
+            const bodyAt = (s) => {
+              if (s <= 0) {
+                const dx = pts[1].x - pts[0].x, dy = pts[1].y - pts[0].y;
+                const ln = Math.hypot(dx, dy) || 1;
+                return { x: pts[0].x, y: pts[0].y, tx: dx/ln, ty: dy/ln };
+              }
+              if (s >= bodyLen) {
+                const n = pts.length - 1;
+                const dx = pts[n].x - pts[n-1].x, dy = pts[n].y - pts[n-1].y;
+                const ln = Math.hypot(dx, dy) || 1;
+                return { x: pts[n].x, y: pts[n].y, tx: dx/ln, ty: dy/ln };
+              }
+              let i = 1; while (i < cum.length && cum[i] < s) i++;
+              const t = (s - cum[i-1]) / ((cum[i] - cum[i-1]) || 1);
+              const dx = pts[i].x - pts[i-1].x, dy = pts[i].y - pts[i-1].y;
+              const ln = Math.hypot(dx, dy) || 1;
+              return {
+                x: pts[i-1].x + dx * t, y: pts[i-1].y + dy * t,
+                tx: dx/ln, ty: dy/ln,
+              };
+            };
+            const bodyToScreen = (along, across) => {
+              const b = bodyAt(along);
+              return { x: b.x - b.ty * across, y: b.y + b.tx * across };
+            };
+            const blotchBodyShape = (seed, alongR, acrossR) => {
+              const ring = [];
+              for (let i = 0; i < 10; i++) {
+                const a = (i / 10) * Math.PI * 2;
+                const j = 0.72 + legendRand01(seed * 13.3 + i * 7.7) * 0.5;
+                ring.push({ dA: Math.cos(a) * alongR * j, dC: Math.sin(a) * acrossR * j });
+              }
+              return ring;
+            };
+            const fillBodyBlotch = (cA, cC, ring, fill) => {
+              const scr = ring.map(r => bodyToScreen(cA + r.dA, cC + r.dC));
+              ctx.beginPath();
+              ctx.moveTo((scr[0].x + scr[scr.length-1].x)/2, (scr[0].y + scr[scr.length-1].y)/2);
+              for (let i = 0; i < scr.length; i++) {
+                const a = scr[i], b = scr[(i+1) % scr.length];
+                ctx.quadraticCurveTo(a.x, a.y, (a.x+b.x)/2, (a.y+b.y)/2);
+              }
+              ctx.closePath();
+              ctx.fillStyle = fill; ctx.fill();
+            };
+
+            // Fixed set of spots pinned to the body — spot N a constant distance
+            // behind the head. Count grows only when the body grows (eats mouse).
+            ctx.save();
+            ctx.clip(bodyPath);
+            const BLOTCH_GAP = 30, FIRST_GAP = 48;
+            const spotCount = Math.floor((bodyLen - FIRST_GAP) / BLOTCH_GAP);
+            for (let n = 1; n <= spotCount; n++) {
+              const along = FIRST_GAP + (n - 1) * BLOTCH_GAP;
+              if (along > bodyLen - 6) continue;
+              const seed = n * 0.137 + 1.7;
+              const across = (legendRand01(seed + 4.2) - 0.5) * 1.7 * BODY_R;
+              const sizeJ = 0.85 + legendRand01(seed + 9.1) * 0.4;
+              const border = blotchBodyShape(seed, BODY_R * 1.2 * sizeJ, BODY_R * 1.05 * sizeJ);
+              fillBodyBlotch(along, across, border, "#1a0f06");
+              const inner = blotchBodyShape(seed + 0.5, BODY_R * 0.95 * sizeJ, BODY_R * 0.82 * sizeJ);
+              fillBodyBlotch(along, across, inner, "#b8860b");
+              const shine = blotchBodyShape(seed + 1.3, BODY_R * 0.5 * sizeJ, BODY_R * 0.42 * sizeJ);
+              fillBodyBlotch(along - BODY_R * 0.25 * sizeJ, across - BODY_R * 0.2 * sizeJ, shine, "#ffd966");
+            }
+            ctx.restore();
           } else {
             strokeRibbon(BODY_R * 2 + 5, skin.dark);
             strokeRibbon(BODY_R * 2,     skin.body);
@@ -952,183 +1071,92 @@ export default function SnakeRunner() {
         const isRealHead = headSkin.special === "realhead";
 
         if (isRealHead) {
-          // ── Ball python head: small, rounded, slightly flattened ──
+          // ── Ball python head — rebuilt to reference (top-down view) ──
           const perp = ang + Math.PI / 2;
+          const HL = BODY_R * 2.75;   // half-length (neck→snout)
+          const HW = BODY_R * 1.45;   // half-width at crown
           const pt = (fwd, side) => ({
             x: sx + Math.cos(ang) * fwd + Math.cos(perp) * side,
             y: sy + Math.sin(ang) * fwd + Math.sin(perp) * side,
           });
 
-          // Head dimensions — ball pythons have a small, distinct rounded head
-          const HW = BODY_R * 1.1;    // half-width
-          const HL = BODY_R * 2.2;    // half-length forward from centre
-
-          // Draw head as a smooth rounded shape using bezier curves
-          // Back of head (where it meets neck) is narrow, widens to crown, narrows to snout
-          const neckL   = pt(-HL * 0.55,  HW * 0.55);
-          const neckR   = pt(-HL * 0.55, -HW * 0.55);
-          const crownL  = pt( HL * 0.05,  HW);
-          const crownR  = pt( HL * 0.05, -HW);
-          const jawL    = pt( HL * 0.55,  HW * 0.7);
-          const jawR    = pt( HL * 0.55, -HW * 0.7);
-          const snoutTip= pt( HL * 1.0,   0);
-          const neckMid = pt(-HL * 0.7,   0);
-
-          // Dark base outline
-          ctx.save();
-          ctx.beginPath();
-          ctx.moveTo(neckMid.x, neckMid.y);
-          ctx.bezierCurveTo(neckL.x, neckL.y, crownL.x, crownL.y, crownL.x, crownL.y);
-          ctx.bezierCurveTo(jawL.x, jawL.y, jawL.x, jawL.y, snoutTip.x, snoutTip.y);
-          ctx.bezierCurveTo(jawR.x, jawR.y, jawR.x, jawR.y, crownR.x, crownR.y);
-          ctx.bezierCurveTo(neckR.x, neckR.y, neckMid.x, neckMid.y, neckMid.x, neckMid.y);
-          ctx.closePath();
-          ctx.fillStyle = "#150d05";
-          ctx.fill();
-          ctx.restore();
-
-          // Main dark brown head base (inset slightly)
-          const niL = pt(-HL*0.5,  HW*0.48);
-          const niR = pt(-HL*0.5, -HW*0.48);
-          const ciL = pt( HL*0.0,  HW*0.88);
-          const ciR = pt( HL*0.0, -HW*0.88);
-          const jiL = pt( HL*0.5,  HW*0.62);
-          const jiR = pt( HL*0.5, -HW*0.62);
-          const sti = pt( HL*0.88, 0);
-          const nmi = pt(-HL*0.62, 0);
-          ctx.save();
-          ctx.beginPath();
-          ctx.moveTo(nmi.x, nmi.y);
-          ctx.bezierCurveTo(niL.x,niL.y, ciL.x,ciL.y, ciL.x,ciL.y);
-          ctx.bezierCurveTo(jiL.x,jiL.y, jiL.x,jiL.y, sti.x,sti.y);
-          ctx.bezierCurveTo(jiR.x,jiR.y, jiR.x,jiR.y, ciR.x,ciR.y);
-          ctx.bezierCurveTo(niR.x,niR.y, nmi.x,nmi.y, nmi.x,nmi.y);
-          ctx.closePath();
-          ctx.fillStyle = "#2a1a0a";
-          ctx.fill();
-          ctx.restore();
-
-          // Tan/caramel blotch on top of head — ball pythons have a characteristic arrow/lance mark
-          ctx.save();
-          const blotchCentre = pt(HL * 0.1, 0);
-          const blotchFront  = pt(HL * 0.65, 0);
-          const blotchW = HW * 0.55;
-          ctx.beginPath();
-          ctx.moveTo(blotchCentre.x - Math.cos(perp)*blotchW*0.3, blotchCentre.y - Math.sin(perp)*blotchW*0.3);
-          ctx.bezierCurveTo(
-            pt(HL*-0.1,  blotchW*0.7).x, pt(HL*-0.1,  blotchW*0.7).y,
-            pt(HL* 0.4,  blotchW).x,     pt(HL* 0.4,  blotchW).y,
-            blotchFront.x, blotchFront.y
-          );
-          ctx.bezierCurveTo(
-            pt(HL* 0.4, -blotchW).x,     pt(HL* 0.4, -blotchW).y,
-            pt(HL*-0.1, -blotchW*0.7).x, pt(HL*-0.1, -blotchW*0.7).y,
-            blotchCentre.x + Math.cos(perp)*blotchW*0.3, blotchCentre.y + Math.sin(perp)*blotchW*0.3
-          );
-          ctx.closePath();
-          ctx.fillStyle = "#c8955a";
-          ctx.fill();
-          // Dark centre stripe through blotch
-          ctx.globalAlpha = 0.45;
-          ctx.fillStyle = "#150d05";
-          const stripeW = HW * 0.12;
-          ctx.beginPath();
-          ctx.ellipse(blotchFront.x - Math.cos(ang)*HW*0.2, blotchFront.y - Math.sin(ang)*HW*0.2, HW*0.08, HW*0.32, ang, 0, Math.PI*2);
-          ctx.fill();
-          ctx.restore();
-
-          // Fine scale texture — tiny hexagon-like dots
-          ctx.save();
-          ctx.globalAlpha = 0.12;
-          ctx.fillStyle = "#000";
-          for (let fi = -1; fi <= 1; fi += 0.5) {
-            for (let fj = -0.6; fj <= 0.6; fj += 0.5) {
-              const sp = pt(HL*fi*0.5, HW*fj*0.7);
-              ctx.beginPath(); ctx.arc(sp.x, sp.y, 1.5, 0, Math.PI*2); ctx.fill();
-            }
-          }
-          ctx.restore();
-
-          // Heat pits — characteristic ball python feature, small pits along jaw
-          ctx.save();
-          ctx.fillStyle = "#0a0a0a";
-          [-0.55, -0.25, 0.25, 0.55].forEach(f => {
-            const pit = pt(HL * 0.5, HW * f * 0.9);
-            ctx.beginPath(); ctx.arc(pit.x, pit.y, 1.2, 0, Math.PI*2); ctx.fill();
-          });
-          ctx.restore();
-
-          // Nostril — single slightly visible pit near snout
-          ctx.save();
-          [-0.32, 0.32].forEach(s => {
-            const n = pt(HL * 0.78, HW * s * 0.5);
-            ctx.beginPath(); ctx.arc(n.x, n.y, 2, 0, Math.PI*2);
-            ctx.fillStyle = "#0d0806"; ctx.fill();
-          });
-          ctx.restore();
-
-          // Eyes — ball python: small, dark, jewel-like with subtle amber ring
-          const eyeFwd  = HL * 0.3;
-          const eyeLat  = HW * 0.72;
-          [-1, 1].forEach(side => {
-            const ex = sx + Math.cos(ang)*eyeFwd + Math.cos(perp)*side*eyeLat;
-            const ey = sy + Math.sin(ang)*eyeFwd + Math.sin(perp)*side*eyeLat;
-            // Dark surround
-            ctx.beginPath(); ctx.arc(ex, ey, BODY_R*0.34, 0, Math.PI*2);
-            ctx.fillStyle = "#0a0a0a"; ctx.fill();
-            // Amber-brown iris
-            ctx.beginPath(); ctx.arc(ex, ey, BODY_R*0.25, 0, Math.PI*2);
-            ctx.fillStyle = "#6b3a0a"; ctx.fill();
-            // Large round pupil (ball pythons have round pupils unlike many snakes)
-            ctx.beginPath(); ctx.arc(ex, ey, BODY_R*0.16, 0, Math.PI*2);
-            ctx.fillStyle = "#050302"; ctx.fill();
-            // Specular shine
-            ctx.beginPath(); ctx.arc(ex - Math.cos(ang)*1.5, ey - Math.sin(ang)*1.5, BODY_R*0.07, 0, Math.PI*2);
-            ctx.fillStyle = "rgba(255,255,255,0.65)"; ctx.fill();
-          });
-
-          // Tongue — slim, dark red
-          ctx.strokeStyle = "#cc2222"; ctx.lineWidth = 1.8; ctx.lineCap = "round";
-          const tongueBase = pt(HL*1.0, 0);
-          const tongueEnd  = pt(HL*1.55, 0);
-          ctx.beginPath(); ctx.moveTo(tongueBase.x, tongueBase.y);
-          ctx.lineTo(tongueEnd.x, tongueEnd.y); ctx.stroke();
-          [-0.42, 0.42].forEach(a => {
-            const fork = pt(HL*1.35, 0);
-            ctx.beginPath(); ctx.moveTo(fork.x, fork.y);
-            ctx.lineTo(fork.x + Math.cos(ang+a)*5, fork.y + Math.sin(ang+a)*5); ctx.stroke();
-          });
-
-          // ── Ball python body pattern: tan blotches on dark background ──
-          // Draw blotches along the path at regular intervals
-          const bpBuf   = gs.pathBuf;
-          const bpHead  = gs.pathHead;
-          const bpTotal = gs.MAX_PATH_PTS;
-          const bpDraw  = Math.min(gs.bodyPts, gs.pathCount);
-          const blotchEvery = 20; // every N path points
-          ctx.save();
-          for (let bi = blotchEvery; bi < bpDraw - blotchEvery; bi += blotchEvery) {
-            const idx0 = (bpHead + bi) % bpTotal;
-            const idx1 = (bpHead + bi + 4) % bpTotal;
-            const bpx  = bpBuf[idx0].x;
-            const bpy  = worldToScreen(bpBuf[idx0].worldY);
-            const bpx1 = bpBuf[idx1].x;
-            const bpy1 = worldToScreen(bpBuf[idx1].worldY);
-            const ba   = Math.atan2(bpy - bpy1, bpx - bpx1);
-            ctx.save();
-            ctx.translate(bpx, bpy);
-            ctx.rotate(ba);
-            // Outer blotch (tan/caramel)
+          // Symmetric silhouette: narrow neck → broad rounded crown → blunt
+          // snout. Mirrored across the centerline so the head never leans.
+          const headOutline = (s) => {
+            const neck = -HL * 1.05, back = -HL * 0.45, crown = HL * 0.05;
+            const cheek = HL * 0.5, snoutB = HL * 0.85, tip = HL * 1.0;
+            const wNeck = BODY_R * 0.95 * s, wBack = HW * 0.82 * s, wCrown = HW * 1.0 * s;
+            const wCheek = HW * 0.92 * s, wSnoutB = HW * 0.6 * s, wTip = HW * 0.18 * s;
             ctx.beginPath();
-            ctx.ellipse(0, 0, BODY_R*0.95, BODY_R*0.7, 0, 0, Math.PI*2);
-            ctx.fillStyle = "#c8955a"; ctx.fill();
-            // Inner dark centre spot
-            ctx.beginPath();
-            ctx.ellipse(0, 0, BODY_R*0.38, BODY_R*0.28, 0, 0, Math.PI*2);
-            ctx.fillStyle = "#2a1a0a"; ctx.fill();
-            ctx.restore();
-          }
+            ctx.moveTo(pt(neck, 0).x, pt(neck, 0).y);
+            ctx.bezierCurveTo(pt(neck, wNeck).x, pt(neck, wNeck).y, pt(back, wBack).x, pt(back, wBack).y, pt(crown, wCrown).x, pt(crown, wCrown).y);
+            ctx.bezierCurveTo(pt(cheek, wCheek).x, pt(cheek, wCheek).y, pt(snoutB, wSnoutB).x, pt(snoutB, wSnoutB).y, pt(tip, wTip).x, pt(tip, wTip).y);
+            ctx.quadraticCurveTo(pt(tip + HL * 0.06, 0).x, pt(tip + HL * 0.06, 0).y, pt(tip, -wTip).x, pt(tip, -wTip).y);
+            ctx.bezierCurveTo(pt(snoutB, -wSnoutB).x, pt(snoutB, -wSnoutB).y, pt(cheek, -wCheek).x, pt(cheek, -wCheek).y, pt(crown, -wCrown).x, pt(crown, -wCrown).y);
+            ctx.bezierCurveTo(pt(back, -wBack).x, pt(back, -wBack).y, pt(neck, -wNeck).x, pt(neck, -wNeck).y, pt(neck, 0).x, pt(neck, 0).y);
+            ctx.closePath();
+          };
+
+          headOutline(1.05); ctx.fillStyle = "#1a1008"; ctx.fill();   // dark edge
+          headOutline(1.0);  ctx.fillStyle = "#0b0805"; ctx.fill();   // body color
+
+          ctx.save();
+          headOutline(1.0); ctx.clip();   // clip markings to head shape
+
+          // Crown blotch — irregular, shiny gold, like the body spots.
+          ctx.save();
+          const crownCx = pt(HL * 0.05, HW * 0.12);
+          ctx.translate(crownCx.x, crownCx.y);
+          ctx.rotate(ang);
+          const cBorder = legendBlotchShape(7.3, HW * 0.9, HW * 0.62);
+          legendFillBlotch(ctx, cBorder, "#1a0f06");
+          const cInner = legendBlotchShape(7.8, HW * 0.74, HW * 0.5);
+          const cg = ctx.createRadialGradient(-HW * 0.2, -HW * 0.15, 1, 0, 0, HW * 0.8);
+          cg.addColorStop(0, "#ffe08a"); cg.addColorStop(0.5, "#e0a92e"); cg.addColorStop(1, "#b8860b");
+          legendFillBlotch(ctx, cInner, cg);
           ctx.restore();
+
+          // Eye-stripes — signature dark band running back from each eye.
+          [-1, 1].forEach((side) => {
+            ctx.beginPath();
+            const e0 = pt(HL * 0.28, side * HW * 0.55);
+            const e1 = pt(HL * 0.62, side * HW * 0.95);
+            const e2 = pt(HL * 0.78, side * HW * 0.6);
+            const e3 = pt(HL * 0.4,  side * HW * 0.78);
+            ctx.moveTo(e0.x, e0.y);
+            ctx.quadraticCurveTo(e1.x, e1.y, e2.x, e2.y);
+            ctx.quadraticCurveTo(e3.x, e3.y, e0.x, e0.y);
+            ctx.closePath();
+            ctx.fillStyle = "#150d05"; ctx.fill();
+          });
+
+          ctx.restore(); // end head clip
+
+          // Eyes — high and to the sides near the crown's widest point.
+          const eyeFwd = HL * 0.32, eyeLat = HW * 0.78;
+          [-1, 1].forEach((side) => {
+            const ex = sx + Math.cos(ang) * eyeFwd + Math.cos(perp) * side * eyeLat;
+            const ey = sy + Math.sin(ang) * eyeFwd + Math.sin(perp) * side * eyeLat;
+            ctx.beginPath(); ctx.arc(ex, ey, BODY_R * 0.36, 0, Math.PI * 2); ctx.fillStyle = "#0a0805"; ctx.fill();
+            ctx.beginPath(); ctx.arc(ex, ey, BODY_R * 0.27, 0, Math.PI * 2); ctx.fillStyle = "#5a3208"; ctx.fill();
+            ctx.beginPath(); ctx.arc(ex, ey, BODY_R * 0.15, 0, Math.PI * 2); ctx.fillStyle = "#050302"; ctx.fill();
+            ctx.beginPath(); ctx.arc(ex - Math.cos(ang) * 1.5, ey - Math.sin(ang) * 1.5, BODY_R * 0.07, 0, Math.PI * 2); ctx.fillStyle = "rgba(255,255,255,0.7)"; ctx.fill();
+          });
+
+          // Nostrils — two tiny dots near the snout tip.
+          [-1, 1].forEach((side) => {
+            const n = pt(HL * 0.9, side * HW * 0.22);
+            ctx.beginPath(); ctx.arc(n.x, n.y, 1.3, 0, Math.PI * 2); ctx.fillStyle = "#0a0604"; ctx.fill();
+          });
+
+          // Tongue — slim forked flick.
+          ctx.strokeStyle = "#b81e1e"; ctx.lineWidth = 1.6; ctx.lineCap = "round";
+          const tB = pt(HL * 1.02, 0), tFork = pt(HL * 1.35, 0);
+          ctx.beginPath(); ctx.moveTo(tB.x, tB.y); ctx.lineTo(tFork.x, tFork.y); ctx.stroke();
+          [-0.4, 0.4].forEach((a) => {
+            ctx.beginPath(); ctx.moveTo(tFork.x, tFork.y);
+            ctx.lineTo(tFork.x + Math.cos(ang + a) * 5, tFork.y + Math.sin(ang + a) * 5); ctx.stroke();
+          });
 
         } else {
           // ── Standard round head ──
@@ -1271,7 +1299,7 @@ export default function SnakeRunner() {
     <div style={S.root}>
       <div style={S.loginCard}>
         <div style={S.logoWrap}>
-          <span style={{fontSize:52}}>🐍</span>
+          <img src={snakeIcon} alt="Snake Runner" style={{width:72,height:72,objectFit:"contain"}} />
           <h1 style={S.logoTitle}>SNAKE RUNNER</h1>
           <p style={S.logoSub}>Slither. Dodge. Devour.</p>
         </div>
